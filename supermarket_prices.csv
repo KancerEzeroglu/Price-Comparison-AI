@@ -1,11 +1,11 @@
-Supermarket,Product,Found Product,Price,Date
-Carrefour,Süt,124,"13,95 TL",2025-03-20
-Carrefour,Ekmek,129,"45,00 TL",2025-03-20
-Carrefour,Kıyma,9,90 TL,2025-03-20
-Carrefour,Un,58,95 TL,2025-03-20
-Carrefour,Yumurta,34,"97,50 TL",2025-03-20
-AH,Melk,Noodzakelijk,2.99,2025-03-20
-AH,Brood,Noodzakelijk,2.29,2025-03-20
-AH,Gehakt,Noodzakelijk,3.69,2025-03-20
-AH,Bloem,Noodzakelijk,0.85,2025-03-20
-AH,Eieren,Noodzakelijk,1.89,2025-03-20
+Supermarket,Product Searched,Product Name,Price,Quantity,Date
+Carrefour,Süt,Teslimat Seçeneği,"13,95 TL",Teslimat,2025-03-20
+Carrefour,Ekmek,Teslimat Seçeneği,"45,00 TL",Teslimat,2025-03-20
+Carrefour,Kıyma,Teslimat Seçeneği,90 TL,Teslimat,2025-03-20
+Carrefour,Un,Teslimat Seçeneği,95 TL,Teslimat,2025-03-20
+Carrefour,Yumurta,Teslimat Seçeneği,"97,50 TL",Teslimat,2025-03-20
+AH,Melk,Noodzakelijk,2.99,"2,4 l",2025-03-20
+AH,Brood,Noodzakelijk,2.29,per stuk,2025-03-20
+AH,Gehakt,Noodzakelijk,3.69,200 g,2025-03-20
+AH,Bloem,Noodzakelijk,0.85,1 kg,2025-03-20
+AH,Eieren,Noodzakelijk,1.89,6 stuks,2025-03-20

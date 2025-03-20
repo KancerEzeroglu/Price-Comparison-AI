@@ -1,5 +1,3 @@
-Date Collected,Supermarket,Search Query,Product Name,Price
-2025-03-20,Carrefour,Pınar 1 litre süt,The price of Pınar 1 litre süt,"44,95 TL"
-2025-03-20,Carrefour,normal ekmek,The price of Normal Ekmek 200 g,"12,00 TL"
-2025-03-20,Carrefour,1kg Un,The price of 1kg of Söke Tam Buğday Un,"54,95 TL"
-2025-03-20,Carrefour,Ayçiçek Yağı 1 Litre,The price of Yudum Ayçiçek Yağı 1 Litre,"125,95 TL"
+Supermarket,Product Searched,Product Name,Price,Quantity,Date
+Carrefour,Süt,Sek Süt 200 Ml,"13,95 TL",Ml,2025-03-20
+AH,Melk,Campina Halfvolle melk voordeelpak,2.99,"2,4 l",2025-03-20
