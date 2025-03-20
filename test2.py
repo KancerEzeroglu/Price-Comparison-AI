@@ -1,4 +1,4 @@
-import time
+import re
 import csv
 import asyncio
 import random
@@ -22,9 +22,19 @@ AI_PROMPT = """You are an AI assistant helping to extract product names, prices,
 2. **Extract the product price**:
    - Look inside `.item-price`, `.formatted-price`, or `.price-amount`
 
-3. **Extract the quantity**:
-   - Carrefour: The quantity is **inside the product name** (e.g., `"Domates Pazar kg"` → `"kg"`)
-   - AH: The quantity is inside `[data-testhook='product-unit-size']` or `.price_unitSize__Hk6E4`
+3. **Quantity Extraction Rules**:
+   - Carrefour:
+     - Extract the **number** and **unit** **from the product name** (inside `<h3 class='item-name'>`).
+     - The unit can be **kg, g, lt, l, ml, adet, paket**.
+     - Example:  
+       - "Sek Süt 200 Ml" → **200 ml**  
+       - "Un 5 kg" → **5 kg**  
+       - "Yumurta 10'lu" → **10 adet**  
+
+   - AH:
+     - The quantity is inside `[data-testhook='product-unit-size']` or `.price_unitSize__Hk6E4`.
+
+If no quantity is found, return **'Unknown'**.
 
 4. **If no product is found, suggest a better search term** in the correct language:
    - Carrefour (Turkish): Suggest a related **Turkish** word.
@@ -102,9 +112,8 @@ async def scrape_prices(url, search_query, supermarket, attempt=1):
         product_quantity = "Unknown"
         try:
             if supermarket == "Carrefour":
-                words = product_name.split()
-                quantity_candidates = [word for word in words if any(unit in word.lower() for unit in ["kg", "g", "lt", "l", "adet", "paket"])]
-                product_quantity = quantity_candidates[0] if quantity_candidates else "Unknown"
+                quantity_match = re.search(r'(\d+)\s*(kg|g|lt|l|ml|adet|paket)', product_name, re.IGNORECASE)
+                product_quantity = f"{quantity_match.group(1)} {quantity_match.group(2)}" if quantity_match else "Unknown"
             else:
                 product_quantity = await page.locator(
                     ".product-unit, .price_unitSize__Hk6E4, .quantity, [data-testhook='product-unit-size']"
@@ -134,16 +143,20 @@ async def scrape_prices(url, search_query, supermarket, attempt=1):
 
 # ✅ List of Products to Search
 products = [
-    ("Carrefour", "Süt"),
-    #("Carrefour", "Ekmek"),
-    #("Carrefour", "Kıyma"),
-    #("Carrefour", "Un"),
-    #("Carrefour", "Yumurta"),
-    ("AH", "Melk"),
-    #("AH", "Brood"),
-    #("AH", "Gehakt"),
-    #("AH", "Bloem"),
-    #("AH", "Eieren"),
+    ("Carrefour", "Pınar 1 litre süt"),
+    ("Carrefour", "normal ekmek"),
+    ("Carrefour", "1kg Dana Kıyma"),
+    ("Carrefour", "1kg Un"),
+    ("Carrefour", "Ayçiçek Yağı 1 Litre"),
+    ("Carrefour", "Yumurta"),
+    ("Carrefour", "kapya biber"),
+    ("AH", "Arla volle melk"),
+    ("AH", "AH Vloerbrood wit heel"),
+    ("AH", "1kg Rundergehakt"),
+    ("AH", "1kg meel"),
+    ("AH", "1lt Zonnebloemolie"),
+    ("AH", "eieren 10"),
+    ("AH", "Sweet palermo rode puntpaprika 250gr"),
 ]
 
 # ✅ CSV File Setup (Include Date in Filename)
