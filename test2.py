@@ -1,16 +1,11 @@
-import csv
 import time
-import datetime
+import csv
+import asyncio
+from datetime import datetime
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType
-from langchain_google_genai import ChatGoogleGenerativeAI
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-import re
+from playwright.async_api import async_playwright
 
 # ✅ Initialize AI Model
 llm = ChatGoogleGenerativeAI(
@@ -18,162 +13,131 @@ llm = ChatGoogleGenerativeAI(
     google_api_key="AIzaSyDkIKB5VaUERkbgdCVXAUyjInuy6OYf9KM"
 )
 
-# ✅ Get Current Date for CSV
-current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-
-# ✅ Configure Browser
-def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run in headless mode
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # Prevent bot detection
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36")
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
-# ✅ Custom Agent Prompt
-agent_prompt = """You are a smart price comparison assistant.
-- When searching Carrefour, **only use Turkish words**.
-- When searching AH.nl, **only use Dutch words**.
-- If no result is found, think of **alternative words in the same language**.
-- Try a maximum of **3 alternative search terms** before stopping.
-- Extract the **first product’s name and price** from the list.
-- Log all search steps and save results to a CSV file.
+# ✅ Define AI Agent Prompt
+agent_prompt = """You are an intelligent web navigation assistant.
+- Visit supermarket websites and search for product prices.
+- **Find the search box dynamically** without hardcoding.
+- **Identify the product name & price dynamically** (do not rely on fixed CSS selectors).
+- If the search fails, try up to **3 alternative search terms** in the same language.
+- Describe how to locate the product name & price on the page.
 """
 
-# ✅ Scraper Function (Handles Carrefour & AH.nl)
-def scrape_supermarket(url, search_query, supermarket, attempt=1):
+# ✅ Async Function to Scrape Prices Fully Dynamically
+async def scrape_prices(url, search_query, supermarket, attempt=1):
     if attempt > 3:
-        print("❌ Maximum search attempts reached. Stopping.")
+        print(f"❌ Maximum search attempts reached for {search_query} in {supermarket}.")
         return None, None
 
-    driver = setup_driver()
-    driver.get(url)
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)  # Set False to see browser actions
+        page = await browser.new_page()
+        await page.goto(url)
+        await asyncio.sleep(3)  # Wait for the page to load
 
-    if supermarket == "Carrefour":
-        print(f"🔍 Searching Carrefour for: {search_query}")
+        print(f"🔍 Searching for {search_query} on {supermarket}...")
 
-        # Handle Cookie Popup
-        try:
-            cookie_popup = driver.find_element(By.ID, "onetrust-accept-btn-handler")
-            cookie_popup.click()
-            print("🍪 Cookie popup removed.")
-        except:
-            print("✅ No cookie popup.")
+        # ✅ Let AI dynamically find the search box & search the product
+        search_box = page.locator("input[type='text'], input[type='search']").first
+        await search_box.fill(search_query)
+        await search_box.press("Enter")  # Simulate pressing enter
+        await asyncio.sleep(5)
 
-        # ✅ **Search Carrefour**
-        try:
-            search_box = driver.find_element(By.ID, "js-site-search-input")
-            search_box.send_keys(search_query)
-            driver.find_element(By.CLASS_NAME, "js-search-validate").click()
-            time.sleep(5)
+        # ✅ AI decides where to extract product name & price dynamically
+        extraction_prompt = f"""
+        I am currently on the search results page for "{search_query}" on {supermarket}.
+        Describe how I should locate:
+        1️⃣ The first product's name
+        2️⃣ The first product's price
+        Just explain where they appear on the page (e.g., inside a div, near an image, next to a buy button).
+        Do NOT return code, just describe in words.
+        """
 
-            # Extract first product details
-            first_product = driver.find_element(By.CLASS_NAME, "item-name").text
-            product_price = driver.find_element(By.CLASS_NAME, "item-price").text
-            print(f"🔹 Found Product: {first_product} - 💰 {product_price}")
-            driver.quit()
-            return first_product, product_price
-        except:
-            print(f"❌ No product found. Asking AI for an alternative search term... (Attempt {attempt}/3)")
-            driver.quit()
-            alternative_term = llm.invoke(f"Suggest a related Turkish search term for {search_query} (only return the word)").strip()
-            return scrape_supermarket(url, alternative_term, supermarket, attempt + 1)
+        # **🔧 Fixed LLM invocation**
+        response = llm.invoke(extraction_prompt)  # ✅ Extract response object
+        extraction_instruction = response.content.strip()  # ✅ Get text response
+        print(f"🧠 AI Extraction Instructions: {extraction_instruction}")
 
-    elif supermarket == "AH":
-        print(f"🔍 Searching AH for: {search_query}")
-        
-        try:
-            search_box = driver.find_element(By.ID, "navigation-search-input")
-            search_box.send_keys(search_query)
-            search_box.send_keys(Keys.RETURN)  # ✅ Simulate pressing Enter instead of clicking
-            time.sleep(5)
+        # ✅ AI Uses Description to Extract Product Name & Price
+        product_name = await page.text_content("xpath=//body")  # Get full page text
+        product_price = None
 
-            # ✅ **AH Product Extraction Using `data-testhook` or XPath**
-            try:
-                first_product = driver.find_element(By.CSS_SELECTOR, "[data-testhook='product-title']").text
-            except:
-                first_product = driver.find_element(By.XPATH, "//strong[contains(@class, 'product-card-portrait_title')]").text
+        # ✅ AI Refines Extraction If Needed
+        if search_query.lower() in product_name.lower():
+            product_name = search_query  # If AI found the correct product name
+            product_price = await page.text_content("xpath=//body[contains(text(), '€')]")
 
-            # ✅ **AH Price Extraction**
-            try:
-                price_integer = driver.find_element(By.CSS_SELECTOR, "[data-testhook='price-amount'] .price-amount_integer__+e2XO").text
-                price_fraction = driver.find_element(By.CSS_SELECTOR, "[data-testhook='price-amount'] .price-amount_fractional__kjJ7u").text
-            except:
-                price_integer = driver.find_element(By.XPATH, "//span[contains(@class, 'price-amount_integer')]").text
-                price_fraction = driver.find_element(By.XPATH, "//span[contains(@class, 'price-amount_fractional')]").text
+        if product_name and product_price:
+            print(f"🔹 Found Product: {product_name}")
+            print(f"💰 Found Price: {product_price}")
+            await browser.close()
+            return product_name.strip(), product_price.strip()
 
-            product_price = f"€{price_integer}.{price_fraction}"
+        # ✅ If no result, try alternative search terms
+        print(f"❌ No product found. Trying alternative term... (Attempt {attempt}/3)")
+        alt_response = await llm.invoke(f"Suggest a better search term for {search_query}")
+        alternative_term = alt_response.content.strip()  # ✅ Extract alternative term
+        await browser.close()
+        return await scrape_prices(url, alternative_term, supermarket, attempt + 1)
 
-            print(f"🔹 Found Product: {first_product} - 💰 {product_price}")
-            driver.quit()
-            return first_product, product_price
-        
-        except:
-            print(f"❌ No product found. Asking AI for an alternative search term... (Attempt {attempt}/3)")
-            driver.quit()
-            alternative_term = llm.invoke({"input": f"Suggest a related Dutch search term for {search_query} (only return the word)"}).content.strip()
-            return scrape_supermarket(url, alternative_term, supermarket, attempt + 1)
-
-    driver.quit()
-    return None, None
-
-# ✅ Define AI Tools
+# ✅ Define AI Tools for Carrefour & AH
 carrefour_tool = Tool(
     name="Carrefour Price Search",
-    func=lambda query: scrape_supermarket("https://www.carrefoursa.com", query, "Carrefour"),
-    description="Searches Carrefour for product prices."
+    func=lambda query: asyncio.run(scrape_prices("https://www.carrefoursa.com", query, "Carrefour")),
+    description="Searches CarrefourSA for product prices."
 )
 
 ah_tool = Tool(
     name="AH Price Search",
-    func=lambda query: scrape_supermarket("https://www.ah.nl", query, "AH"),
+    func=lambda query: asyncio.run(scrape_prices("https://www.ah.nl", query, "AH")),
     description="Searches Albert Heijn (AH.nl) for product prices."
 )
 
-# ✅ Initialize Agent
+# ✅ Create AI Agent with Custom Prompt
 agent = initialize_agent(
     tools=[carrefour_tool, ah_tool],
     llm=llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
-    agent_kwargs={"system_message": agent_prompt}
+    agent_kwargs={"system_message": agent_prompt}  # 🔥 Custom Prompt
 )
 
-# ✅ Search Queries
-carrefour_keywords = ["Pınar 1 litre süt", "normal ekmek", "1kg Dana Kıyma", "1kg Un", "Ayçiçek Yağı 1 Litre", "10 Adet Yumurta", "kapya biber kg"]
-ah_keywords = ["Arla volle melk", "AH Vloerbrood wit heel", "1kg Rundergehakt", "1kg meel", "1lt Zonnebloemolie", "eieren 10", "Sweet palermo rode puntpaprika 250gr"]
+# ✅ List of Products to Search
+products = [
+    ("Carrefour", "Süt"),
+    ("Carrefour", "Ekmek"),
+    ("Carrefour", "Kıyma"),
+    ("Carrefour", "Un"),
+    ("Carrefour", "Yumurta"),
+    ("AH", "Melk"),
+    ("AH", "Brood"),
+    ("AH", "Gehakt"),
+    ("AH", "Bloem"),
+    ("AH", "Eieren"),
+]
 
-# ✅ CSV File Setup with Date
-csv_filename = f"supermarket_prices_{current_date}.csv"
+# ✅ CSV File Setup
+csv_filename = "supermarket_prices.csv"
+header = ["Supermarket", "Product", "Found Product", "Price", "Date"]
 
-# ✅ Open CSV and Collect Data
-with open(csv_filename, mode="w", newline="", encoding="utf-8") as file:
-    writer = csv.writer(file)
-    writer.writerow(["Date Collected", "Supermarket", "Search Query", "Product Name", "Price"])
+# ✅ Fetch Prices and Save to CSV
+async def fetch_and_save_prices():
+    with open(csv_filename, mode="w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(header)
 
-    # ✅ Search Carrefour Keywords
-    for keyword in carrefour_keywords:
-        result = agent.invoke({"input": f"Find the price of {keyword} in Carrefour."})
-        response_text = result["output"]
+        for supermarket, product in products:
+            print(f"\n🔍 **Searching {supermarket} for {product}**")
+            found_product, price = await scrape_prices(
+                "https://www.carrefoursa.com" if supermarket == "Carrefour" else "https://www.ah.nl",
+                product,
+                supermarket
+            )
 
-        # ✅ Extract Product Name & Price from AI Output
-        match = re.search(r"(.+?) in Carrefour is (.+?)\.", response_text)
-        if match:
-            product_name, price = match.groups()
-            writer.writerow([current_date, "Carrefour", keyword, product_name.strip(), price.strip()])
-        else:
-            print(f"⚠ Unable to parse Carrefour response: {response_text}")
+            # ✅ Save Data to CSV
+            date = datetime.now().strftime("%Y-%m-%d")
+            writer.writerow([supermarket, product, found_product, price, date])
 
-    # ✅ Search AH Keywords
-    for keyword in ah_keywords:
-        result = agent.invoke({"input": f"Find the price of {keyword} in AH."})
-        response_text = result["output"]
+# ✅ Run the Search Process
+asyncio.run(fetch_and_save_prices())
 
-        # ✅ Extract Product Name & Price from AI Output
-        match = re.search(r"(.+?) in AH is (.+?)\.", response_text)
-        if match:
-            product_name, price = match.groups()
-            writer.writerow([current_date, "Albert Heijn", keyword, product_name.strip(), price.strip()])
-        else:
-            print(f"⚠ Unable to parse AH response: {response_text}")
-
-print(f"✅ Data saved to {csv_filename}")
+print(f"\n📁 Data saved to {csv_filename}")
