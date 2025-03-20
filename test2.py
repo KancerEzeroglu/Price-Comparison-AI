@@ -1,3 +1,6 @@
+import csv
+import time
+import datetime
 from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -7,7 +10,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-import time
+import re
 
 # ✅ Initialize AI Model
 llm = ChatGoogleGenerativeAI(
@@ -15,34 +18,36 @@ llm = ChatGoogleGenerativeAI(
     google_api_key="AIzaSyDkIKB5VaUERkbgdCVXAUyjInuy6OYf9KM"
 )
 
-# ✅ Common Browser Configuration
+# ✅ Get Current Date for CSV
+current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+
+# ✅ Configure Browser
 def setup_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run in headless mode (no GUI)
+    chrome_options.add_argument("--headless")  # Run in headless mode
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # Prevent bot detection
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36")
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-# ✅ Custom Agent Prompt (Ensures Correct Language & Structure)
+# ✅ Custom Agent Prompt
 agent_prompt = """You are a smart price comparison assistant.
 - When searching Carrefour, **only use Turkish words**.
 - When searching AH.nl, **only use Dutch words**.
-- If no result is found, think of **alternative words in the same language** (e.g., synonyms, related words).
+- If no result is found, think of **alternative words in the same language**.
 - Try a maximum of **3 alternative search terms** before stopping.
 - Extract the **first product’s name and price** from the list.
-- Display the **product name and price** in a structured format.
+- Log all search steps and save results to a CSV file.
 """
 
-# ✅ Supermarket Scraper (CarrefourSA & AH.nl)
+# ✅ Scraper Function (Handles Carrefour & AH.nl)
 def scrape_supermarket(url, search_query, supermarket, attempt=1):
     if attempt > 3:
         print("❌ Maximum search attempts reached. Stopping.")
-        return f"No product found in {supermarket}."
+        return None, None
 
     driver = setup_driver()
     driver.get(url)
 
-    # 🏪 **CarrefourSA**
     if supermarket == "Carrefour":
         print(f"🔍 Searching Carrefour for: {search_query}")
 
@@ -54,31 +59,28 @@ def scrape_supermarket(url, search_query, supermarket, attempt=1):
         except:
             print("✅ No cookie popup.")
 
-        # ✅ **Fixed Carrefour Search Logic**
+        # ✅ **Search Carrefour**
         try:
             search_box = driver.find_element(By.ID, "js-site-search-input")
             search_box.send_keys(search_query)
-            driver.find_element(By.CLASS_NAME, "js-search-validate").click()  # ✅ Click search button
+            driver.find_element(By.CLASS_NAME, "js-search-validate").click()
             time.sleep(5)
 
             # Extract first product details
             first_product = driver.find_element(By.CLASS_NAME, "item-name").text
             product_price = driver.find_element(By.CLASS_NAME, "item-price").text
-            print(f"🔹 Found Product: {first_product}")
-            print(f"💰 Found Price: {product_price}")
+            print(f"🔹 Found Product: {first_product} - 💰 {product_price}")
             driver.quit()
-            return f"{first_product} - {product_price}"
+            return first_product, product_price
         except:
             print(f"❌ No product found. Asking AI for an alternative search term... (Attempt {attempt}/3)")
             driver.quit()
             alternative_term = llm.invoke(f"Suggest a related Turkish search term for {search_query} (only return the word)").strip()
             return scrape_supermarket(url, alternative_term, supermarket, attempt + 1)
 
-    # 🇳🇱 **Albert Heijn (AH.nl)**
     elif supermarket == "AH":
         print(f"🔍 Searching AH for: {search_query}")
-
-        # Perform Search
+        
         try:
             search_box = driver.find_element(By.ID, "navigation-search-input")
             search_box.send_keys(search_query)
@@ -101,10 +103,10 @@ def scrape_supermarket(url, search_query, supermarket, attempt=1):
 
             product_price = f"€{price_integer}.{price_fraction}"
 
-            print(f"🔹 Found Product: {first_product}")
-            print(f"💰 Found Price: {product_price}")
+            print(f"🔹 Found Product: {first_product} - 💰 {product_price}")
             driver.quit()
-            return f"{first_product} - {product_price}"
+            return first_product, product_price
+        
         except:
             print(f"❌ No product found. Asking AI for an alternative search term... (Attempt {attempt}/3)")
             driver.quit()
@@ -112,9 +114,9 @@ def scrape_supermarket(url, search_query, supermarket, attempt=1):
             return scrape_supermarket(url, alternative_term, supermarket, attempt + 1)
 
     driver.quit()
-    return f"No product found in {supermarket}."
+    return None, None
 
-# ✅ Define AI Tools for Carrefour & AH
+# ✅ Define AI Tools
 carrefour_tool = Tool(
     name="Carrefour Price Search",
     func=lambda query: scrape_supermarket("https://www.carrefoursa.com", query, "Carrefour"),
@@ -127,23 +129,51 @@ ah_tool = Tool(
     description="Searches Albert Heijn (AH.nl) for product prices."
 )
 
-# ✅ Create the AI Agent with Custom Prompt
+# ✅ Initialize Agent
 agent = initialize_agent(
     tools=[carrefour_tool, ah_tool],
     llm=llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
-    agent_kwargs={"system_message": agent_prompt}  # 🔥 Custom Prompt
+    agent_kwargs={"system_message": agent_prompt}
 )
 
-# ✅ Ask AI to find product prices
-product_carrefour = "Pınar 1 litre süt"
-product_ah = "Arla volle melk"
+# ✅ Search Queries
+carrefour_keywords = ["Pınar 1 litre süt", "normal ekmek", "1kg Dana Kıyma", "1kg Un", "Ayçiçek Yağı 1 Litre", "10 Adet Yumurta", "kapya biber kg"]
+ah_keywords = ["Arla volle melk", "AH Vloerbrood wit heel", "1kg Rundergehakt", "1kg meel", "1lt Zonnebloemolie", "eieren 10", "Sweet palermo rode puntpaprika 250gr"]
 
-print("\n🔍 **Searching CarrefourSA...**")
-result_carrefour = agent.invoke({"input": f"Find the price of {product_carrefour} in Carrefour."})
-print(f"🛒 Carrefour Result: {result_carrefour}")
+# ✅ CSV File Setup with Date
+csv_filename = f"supermarket_prices_{current_date}.csv"
 
-print("\n🔍 **Searching Albert Heijn (AH.nl)...**")
-result_ah = agent.invoke({"input": f"Find the price of {product_ah} in AH."})
-print(f"🛒 AH Result: {result_ah}")
+# ✅ Open CSV and Collect Data
+with open(csv_filename, mode="w", newline="", encoding="utf-8") as file:
+    writer = csv.writer(file)
+    writer.writerow(["Date Collected", "Supermarket", "Search Query", "Product Name", "Price"])
+
+    # ✅ Search Carrefour Keywords
+    for keyword in carrefour_keywords:
+        result = agent.invoke({"input": f"Find the price of {keyword} in Carrefour."})
+        response_text = result["output"]
+
+        # ✅ Extract Product Name & Price from AI Output
+        match = re.search(r"(.+?) in Carrefour is (.+?)\.", response_text)
+        if match:
+            product_name, price = match.groups()
+            writer.writerow([current_date, "Carrefour", keyword, product_name.strip(), price.strip()])
+        else:
+            print(f"⚠ Unable to parse Carrefour response: {response_text}")
+
+    # ✅ Search AH Keywords
+    for keyword in ah_keywords:
+        result = agent.invoke({"input": f"Find the price of {keyword} in AH."})
+        response_text = result["output"]
+
+        # ✅ Extract Product Name & Price from AI Output
+        match = re.search(r"(.+?) in AH is (.+?)\.", response_text)
+        if match:
+            product_name, price = match.groups()
+            writer.writerow([current_date, "Albert Heijn", keyword, product_name.strip(), price.strip()])
+        else:
+            print(f"⚠ Unable to parse AH response: {response_text}")
+
+print(f"✅ Data saved to {csv_filename}")
