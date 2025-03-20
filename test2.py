@@ -1,6 +1,7 @@
 import time
 import csv
 import asyncio
+import random
 from datetime import datetime
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import Tool
@@ -23,6 +24,13 @@ agent_prompt = """You are an intelligent web navigation assistant.
 - Describe how to locate the product name & price on the page.
 """
 
+# ✅ Rotate User-Agents
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.83 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36",
+]
+
 # ✅ Async Function to Scrape Prices
 async def scrape_prices(url, search_query, supermarket, attempt=1):
     if attempt > 3:
@@ -30,18 +38,35 @@ async def scrape_prices(url, search_query, supermarket, attempt=1):
         return None, None
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)  # Set False to debug visually
+        # ✅ Launch real browser with user-agent & bypass detection
+        browser = await p.chromium.launch_persistent_context(
+            user_data_dir="browser_data",  # Saves session & cookies
+            headless=False,  # Set False to debug visually
+            args=[
+                f"--user-agent={random.choice(USER_AGENTS)}",
+                "--disable-blink-features=AutomationControlled",  # Prevent bot detection
+                "--disable-web-security",
+                "--disable-features=IsolateOrigins,site-per-process",
+            ]
+        )
+
         page = await browser.new_page()
         await page.goto(url, timeout=60000)  # Increase timeout for slow loading pages
-        await asyncio.sleep(5)  # Give time for page to fully load
+        await asyncio.sleep(random.uniform(3, 6))  # Human-like delay
 
         print(f"🔍 Searching for {search_query} on {supermarket}...")
 
-        # ✅ Let AI dynamically find the search box & search the product
+        # ✅ **AH Bot Bypass**: Scroll, Hover, Add Random Delays
+        await page.mouse.move(random.randint(0, 800), random.randint(0, 600))  # Move mouse randomly
+        await asyncio.sleep(random.uniform(2, 5))  # Wait before interacting
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight);")  # Scroll down
+
+        # ✅ Find & Fill Search Box
         search_box = page.locator("input[type='text'], input[type='search']").first
         await search_box.fill(search_query)
+        await asyncio.sleep(random.uniform(2, 4))
         await search_box.press("Enter")  # Simulate pressing enter
-        await asyncio.sleep(6)
+        await asyncio.sleep(random.uniform(5, 8))  # Give time to load results
 
         # ✅ AI decides where to extract product name & price dynamically
         extraction_prompt = f"""
@@ -86,28 +111,6 @@ async def scrape_prices(url, search_query, supermarket, attempt=1):
         alternative_term = alt_response.content.strip()
         await browser.close()
         return await scrape_prices(url, alternative_term, supermarket, attempt + 1)
-
-# ✅ Define AI Tools for Carrefour & AH
-carrefour_tool = Tool(
-    name="Carrefour Price Search",
-    func=lambda query: asyncio.run(scrape_prices("https://www.carrefoursa.com", query, "Carrefour")),
-    description="Searches CarrefourSA for product prices."
-)
-
-ah_tool = Tool(
-    name="AH Price Search",
-    func=lambda query: asyncio.run(scrape_prices("https://www.ah.nl", query, "AH")),
-    description="Searches Albert Heijn (AH.nl) for product prices."
-)
-
-# ✅ Create AI Agent with Custom Prompt
-agent = initialize_agent(
-    tools=[carrefour_tool, ah_tool],
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True,
-    agent_kwargs={"system_message": agent_prompt}  # 🔥 Custom Prompt
-)
 
 # ✅ List of Products to Search
 products = [
