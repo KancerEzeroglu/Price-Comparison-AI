@@ -204,7 +204,7 @@ products = [
 ]
 
 # ✅ CSV File Setup (Include Date in Filename)
-csv_filename = f"supermarket_prices_{datetime.now().strftime('%Y-%m-%d')}.csv"
+csv_filename = "supermarket_prices.csv"
 header = ["Supermarket", "Product Searched", "Category", "Product Name", "Price", "Quantity", "Date"]
 
 # ✅ Fetch Prices and Save to CSV

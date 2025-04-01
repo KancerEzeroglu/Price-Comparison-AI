@@ -1,11 +1,7 @@
-Supermarket,Product Searched,Product Name,Price,Quantity,Date
-Carrefour,Süt,Teslimat Seçeneği,"13,95 TL",Teslimat,2025-03-20
-Carrefour,Ekmek,Teslimat Seçeneği,"45,00 TL",Teslimat,2025-03-20
-Carrefour,Kıyma,Teslimat Seçeneği,90 TL,Teslimat,2025-03-20
-Carrefour,Un,Teslimat Seçeneği,95 TL,Teslimat,2025-03-20
-Carrefour,Yumurta,Teslimat Seçeneği,"97,50 TL",Teslimat,2025-03-20
-AH,Melk,Noodzakelijk,2.99,"2,4 l",2025-03-20
-AH,Brood,Noodzakelijk,2.29,per stuk,2025-03-20
-AH,Gehakt,Noodzakelijk,3.69,200 g,2025-03-20
-AH,Bloem,Noodzakelijk,0.85,1 kg,2025-03-20
-AH,Eieren,Noodzakelijk,1.89,6 stuks,2025-03-20
+Supermarket,Product Searched,Category,Product Name,Price,Quantity,Date
+Carrefour,Pınar 1 litre süt,milk,Pınar Süt 1 Litre,45 TL,1 L,2025-04-01
+Carrefour,Yumurta,egg,Carrefour Kafessiz Yumurta 30'lu S Boy,00 TL,30 adet,2025-04-01
+Carrefour,kapya biber,vegetable,Kapya Biber kg,"119,90 TL",1 kg,2025-04-01
+AH,Arla volle melk,milk,Arla Biologisch volle melk,1.99,1 l,2025-04-01
+AH,1kg Rundergehakt,minced_meat,AH Rundergehakt,8.99,1000 g,2025-04-01
+AH,Sweet palermo rode puntpaprika,vegetable,AH Sweet palermo rode puntpaprika,1.89,2 stuks,2025-04-01
