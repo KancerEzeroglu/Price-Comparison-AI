@@ -17,7 +17,10 @@ jobs:
           python-version: "3.11"
       
       - name: Install Playwright Browsers
-        run: playwright install chromium
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install chromium
 
       - name: Install dependencies
         run: |
@@ -35,3 +38,10 @@ jobs:
           git add supermarket_prices.csv
           git commit -m "Update price data [auto]" || echo "No changes to commit"
           git push
+      
+      - name: Copy latest HTML and CSS into /docs
+        run: |
+          mkdir -p docs
+          cp templates/index.html docs/
+          cp static/style.css docs/
+          echo "✅ Copied files to docs/"
