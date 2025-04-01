@@ -73,7 +73,7 @@ async def scrape_prices(url, search_query, supermarket, attempt=1):
         # ✅ Launch browser with user-agent & bypass detection
         browser = await p.chromium.launch_persistent_context(
             user_data_dir="browser_data",  # Saves session & cookies
-            headless=False,  # Set False to debug visually
+            headless=True,  # Set False to debug visually
             args=[
                 f"--user-agent={random.choice(USER_AGENTS)}",
                 "--disable-blink-features=AutomationControlled",
