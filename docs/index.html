@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Supermarket Prices</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>📊 Supermarket Price Comparison</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Supermarket</th>
+        <th>Product Searched</th>
+        <th>Product Name</th>
+        <th>Price</th>
+        <th>Quantity</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in prices %}
+      <tr>
+        <td>{{ row['Supermarket'] }}</td>
+        <td>{{ row['Product Searched'] }}</td>
+        <td>{{ row['Product Name'] }}</td>
+        <td>{{ row['Price'] }}</td>
+        <td>{{ row['Quantity'] }}</td>
+        <td>{{ row['Date'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
