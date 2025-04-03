@@ -32,3 +32,14 @@ jobs:
       - name: Run scraper
         run: |
           python priceComparison.py
+      
+      - name: Generate static HTML from CSV
+        run: python readCsv.py
+
+      - name: Commit and Push CSV + HTML
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add supermarket_prices.csv docs/index.html
+          git commit -m "📦 Daily update: scrape and HTML generated"
+          git push
