@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    with open("supermarket_prices_2025-04-01.csv", newline='', encoding="utf-8") as f:
+    with open("supermarket_prices.csv", newline='', encoding="utf-8") as f:
         reader = csv.DictReader(f)
         prices = list(reader)
 

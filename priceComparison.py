@@ -1,4 +1,5 @@
 import re
+import os
 import csv
 import asyncio
 import random
@@ -9,7 +10,7 @@ from playwright.async_api import async_playwright
 # ✅ Initialize AI Model (Google Gemini)
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
-    google_api_key="API_KEY"
+    google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
 # ✅ Custom AI Prompt (Structured Extraction)
