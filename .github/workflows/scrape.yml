@@ -32,18 +32,3 @@ jobs:
       - name: Run scraper
         run: |
           python priceComparison.py
-
-      - name: Commit updated CSV
-        run: |
-          git config user.name "KancerEzeroglu"
-          git config user.email "ezeroglukancer@gmail.com"
-          git add supermarket_prices.csv
-          git commit -m "Update price data [auto]" || echo "No changes to commit"
-          git push
-      
-      - name: Copy latest HTML and CSS into /docs
-        run: |
-          mkdir -p docs
-          cp templates/index.html docs/
-          cp static/style.css docs/
-          echo "✅ Copied files to docs/"
