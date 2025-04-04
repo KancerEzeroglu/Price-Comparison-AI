@@ -38,8 +38,8 @@ jobs:
 
       - name: Commit and Push CSV + HTML
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add supermarket_prices.csv docs/index.html
-          git commit -m "📦 Daily update: scrape and HTML generated"
-          git push
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git commit -m "📦 Daily update: scrape and HTML generated" || echo "Nothing to commit"
+          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git HEAD:main
