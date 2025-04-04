@@ -36,10 +36,13 @@ jobs:
       - name: Generate static HTML from CSV
         run: python generateHtml.py
 
-      - name: Commit and Push CSV + HTML
+      - name: Commit & Push
+        env:
+          TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html
-          git commit -m "📦 Daily update: scrape and HTML generated" || echo "Nothing to commit"
-          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git HEAD:main
+          git config --global user.email "ezeroglukancer@gmail.com"
+          git config --global user.name "KancerEzeroglu"
+          git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
+          git add docs/index.html supermarket_prices.csv
+          git commit -m "📦 Daily update: scrape and HTML generated" || echo "No changes to commit"
+          git push origin main
