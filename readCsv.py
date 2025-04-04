@@ -8,12 +8,13 @@ def generate_static_html():
         reader = csv.DictReader(f)
         prices = list(reader)
 
-    rendered_html = render_template("index.html", prices=prices)
+    # ✅ Render template inside an application context
+    with app.app_context():
+        rendered_html = render_template("index.html", prices=prices)
 
-    # ✅ Save static version
-    with open("docs/index.html", "w", encoding="utf-8") as static_file:
-        static_file.write(rendered_html)
-
+        # ✅ Save static version to /docs
+        with open("docs/index.html", "w", encoding="utf-8") as static_file:
+            static_file.write(rendered_html)
     print("✅ Static HTML generated at docs/index.html")
 
 @app.route("/")
