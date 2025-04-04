@@ -34,7 +34,7 @@ jobs:
           python priceComparison.py
       
       - name: Generate static HTML from CSV
-        run: python readCsv.py
+        run: python generateHtml.py
 
       - name: Commit and Push CSV + HTML
         run: |
